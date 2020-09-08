@@ -1,3 +1,59 @@
+# From 0.9.9 to 0.9.10
+
+## Additions
+
+- New node descriptor: `first_ancestor`.
+- New node modifiers: `horizontal`, `vertical`.
+
+## Changes
+
+- The node descriptors `next` and `prev` might now return any node. The previous behavior can be emulated by appending `.!hidden.window`.
+- The node descriptors `pointed`, `biggest` and `smallest` now return leaves (in particular `pointed` will now return the *id* of a pointed receptacle). The previous behavior can be emulated by appending `.window`.
+- The *query* command now handles all the possible descriptor-free constraints (for example, `query -N -d .active` now works as expected).
+- The rules can now match against the window's names (`WM_NAME`).
+- The configuration script now receives an argument to indicate whether is was executed after a restart or not.
+- The *intermediate consequences* passed to the external rules command are now in resolved form to avoid unwanted code execution.
+
+# From 0.9.8 to 0.9.9
+
+- Fix a memory allocation bug in the implementation of `wm --restart`.
+- Honor `single_monocle` when the `hidden` flag is toggled.
+
+# From 0.9.7 to 0.9.8
+
+- Fix a potential infinite loop.
+- Fix two bugs having to do with `single_monocle`.
+- Honor `removal_adjustment` for the spiral automatic insertion scheme.
+
+# From 0.9.6 to 0.9.7
+
+This release fixes a bug in the behavior of `single_monocle`.
+
+# From 0.9.4 to 0.9.6
+
+## Additions
+
+- New *wm* command: `--restart`. It was already possible to restart `bspwm` without loosing the current state through `--{dump,load}-state`, but this command will also keep the existing subscribers intact.
+- New settings: `automatic_scheme`, `removal_adjustment`. The automatic insertion mode now provides three ways of inserting a new node: `spiral`, `longest_side` (the default) and `alternate`. Those schemes are described in the README.
+- New settings: `ignore_ewmh_struts`, `presel_feedback`, `{top,right,bottom,left}_monocle_padding`.
+- New node descriptor: `smallest`.
+- New desktop modifier: `active`.
+
+## Changes
+
+- The `focused` and `active` modifiers now mean the same thing across every object.
+- Fullscreen windows are no longer sent to the `above` layer. Within the same layer, fullscreen windows are now above floating windows. If you want a floating window to be above a fullscreen window, you'll need to rely on layers.
+- Pseudo-tiled windows now shrink automatically.
+
+## Removals
+
+- The `paddingless_monocle` setting was removed (and subsumed). The effect of `paddingless_monocle` can now be achieved with:
+```shell
+for side in top right bottom left; do
+	bspc config ${side}_monocle_padding -$(bspc config ${side}_padding)
+done
+```
+
 # From 0.9.3 to 0.9.4
 
 ## Changes

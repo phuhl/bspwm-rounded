@@ -44,7 +44,9 @@
 #define BORDER_RADIUS        0
 #define SPLIT_RATIO          0.5
 #define AUTOMATIC_SCHEME     SCHEME_LONGEST_SIDE
+#define REMOVAL_ADJUSTMENT   true
 
+#define PRESEL_FEEDBACK             true
 #define BORDERLESS_MONOCLE          false
 #define GAPLESS_MONOCLE             false
 #define SINGLE_MONOCLE              false
@@ -56,6 +58,7 @@
 #define SWALLOW_FIRST_CLICK         false
 #define IGNORE_EWMH_FOCUS           false
 #define IGNORE_EWMH_FULLSCREEN      0
+#define IGNORE_EWMH_STRUTS          false
 
 #define CENTER_PSEUDO_TILED         true
 #define HONOR_SIZE_HINTS            false
@@ -65,49 +68,52 @@
 #define REMOVE_UNPLUGGED_MONITORS   false
 #define MERGE_OVERLAPPING_MONITORS  false
 
-char external_rules_command[MAXLEN];
-char status_prefix[MAXLEN];
+extern char external_rules_command[MAXLEN];
+extern char status_prefix[MAXLEN];
 
-char normal_border_color[MAXLEN];
-char active_border_color[MAXLEN];
-char focused_border_color[MAXLEN];
-char presel_feedback_color[MAXLEN];
+extern char normal_border_color[MAXLEN];
+extern char active_border_color[MAXLEN];
+extern char focused_border_color[MAXLEN];
+extern char presel_feedback_color[MAXLEN];
 
-padding_t padding;
-padding_t monocle_padding;
-int window_gap;
-unsigned int border_width;
-unsigned int border_radius;
-double split_ratio;
-child_polarity_t initial_polarity;
-automatic_scheme_t automatic_scheme;
-tightness_t directional_focus_tightness;
+extern padding_t padding;
+extern padding_t monocle_padding;
+extern int window_gap;
+extern unsigned int border_width;
+extern unsigned int border_radius;
+extern double split_ratio;
+extern child_polarity_t initial_polarity;
+extern automatic_scheme_t automatic_scheme;
+extern bool removal_adjustment;
+extern tightness_t directional_focus_tightness;
 
-uint16_t pointer_modifier;
-uint32_t pointer_motion_interval;
-pointer_action_t pointer_actions[3];
-int8_t mapping_events_count;
+extern uint16_t pointer_modifier;
+extern uint32_t pointer_motion_interval;
+extern pointer_action_t pointer_actions[3];
+extern int8_t mapping_events_count;
 
-bool borderless_monocle;
-bool gapless_monocle;
-bool single_monocle;
+extern bool presel_feedback;
+extern bool borderless_monocle;
+extern bool gapless_monocle;
+extern bool single_monocle;
 
-bool focus_follows_pointer;
-bool pointer_follows_focus;
-bool pointer_follows_monitor;
-int8_t click_to_focus;
-bool swallow_first_click;
-bool ignore_ewmh_focus;
-state_transition_t ignore_ewmh_fullscreen;
+extern bool focus_follows_pointer;
+extern bool pointer_follows_focus;
+extern bool pointer_follows_monitor;
+extern int8_t click_to_focus;
+extern bool swallow_first_click;
+extern bool ignore_ewmh_focus;
+extern bool ignore_ewmh_struts;
+extern state_transition_t ignore_ewmh_fullscreen;
 
-bool center_pseudo_tiled;
-bool honor_size_hints;
+extern bool center_pseudo_tiled;
+extern bool honor_size_hints;
 
-bool remove_disabled_monitors;
-bool remove_unplugged_monitors;
-bool merge_overlapping_monitors;
+extern bool remove_disabled_monitors;
+extern bool remove_unplugged_monitors;
+extern bool merge_overlapping_monitors;
 
-void run_config(void);
+void run_config(int run_level);
 void load_settings(void);
 
 #endif

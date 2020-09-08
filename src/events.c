@@ -35,6 +35,8 @@
 #include "rule.h"
 #include "events.h"
 
+uint8_t randr_base;
+
 void handle_event(xcb_generic_event_t *evt)
 {
 	uint8_t resp_type = XCB_EVENT_RESPONSE_TYPE(evt);
@@ -260,7 +262,7 @@ void property_notify(xcb_generic_event_t *evt)
 {
 	xcb_property_notify_event_t *e = (xcb_property_notify_event_t *) evt;
 
-	if (e->atom == ewmh->_NET_WM_STRUT_PARTIAL && ewmh_handle_struts(e->window)) {
+	if (!ignore_ewmh_struts && e->atom == ewmh->_NET_WM_STRUT_PARTIAL && ewmh_handle_struts(e->window)) {
 		for (monitor_t *m = mon_head; m != NULL; m = m->next) {
 			for (desktop_t *d = m->desk_head; d != NULL; d = d->next) {
 				arrange(m, d);

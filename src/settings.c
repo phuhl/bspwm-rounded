@@ -28,16 +28,61 @@
 #include "bspwm.h"
 #include "settings.h"
 
-extern char **environ;
+char external_rules_command[MAXLEN];
+char status_prefix[MAXLEN];
 
-void run_config(void)
+char normal_border_color[MAXLEN];
+char active_border_color[MAXLEN];
+char focused_border_color[MAXLEN];
+char presel_feedback_color[MAXLEN];
+
+padding_t padding;
+padding_t monocle_padding;
+int window_gap;
+unsigned int border_width;
+unsigned int border_radius;
+double split_ratio;
+child_polarity_t initial_polarity;
+automatic_scheme_t automatic_scheme;
+bool removal_adjustment;
+tightness_t directional_focus_tightness;
+
+uint16_t pointer_modifier;
+uint32_t pointer_motion_interval;
+pointer_action_t pointer_actions[3];
+int8_t mapping_events_count;
+
+bool presel_feedback;
+bool borderless_monocle;
+bool gapless_monocle;
+bool single_monocle;
+
+bool focus_follows_pointer;
+bool pointer_follows_focus;
+bool pointer_follows_monitor;
+int8_t click_to_focus;
+bool swallow_first_click;
+bool ignore_ewmh_focus;
+bool ignore_ewmh_struts;
+state_transition_t ignore_ewmh_fullscreen;
+
+bool center_pseudo_tiled;
+bool honor_size_hints;
+
+bool remove_disabled_monitors;
+bool remove_unplugged_monitors;
+bool merge_overlapping_monitors;
+
+void run_config(int run_level)
 {
 	if (fork() == 0) {
 		if (dpy != NULL) {
 			close(xcb_get_file_descriptor(dpy));
 		}
 		setsid();
-		execle(config_path, config_path, (char *) NULL, environ);
+		char arg1[2];
+		snprintf(arg1, 2, "%i", run_level);
+		execl(config_path, config_path, arg1, (char *) NULL);
 		err("Couldn't execute the configuration file.\n");
 	}
 }
@@ -59,7 +104,8 @@ void load_settings(void)
 	border_radius = BORDER_RADIUS;
 	split_ratio = SPLIT_RATIO;
 	initial_polarity = SECOND_CHILD;
-	automatic_scheme = SCHEME_LONGEST_SIDE;
+	automatic_scheme = AUTOMATIC_SCHEME;
+	removal_adjustment = REMOVAL_ADJUSTMENT;
 	directional_focus_tightness = TIGHTNESS_HIGH;
 
 	pointer_modifier = POINTER_MODIFIER;
@@ -69,6 +115,7 @@ void load_settings(void)
 	pointer_actions[2] = ACTION_RESIZE_CORNER;
 	mapping_events_count = MAPPING_EVENTS_COUNT;
 
+	presel_feedback = PRESEL_FEEDBACK;
 	borderless_monocle = BORDERLESS_MONOCLE;
 	gapless_monocle = GAPLESS_MONOCLE;
 	single_monocle = SINGLE_MONOCLE;
@@ -80,6 +127,7 @@ void load_settings(void)
 	swallow_first_click = SWALLOW_FIRST_CLICK;
 	ignore_ewmh_focus = IGNORE_EWMH_FOCUS;
 	ignore_ewmh_fullscreen = IGNORE_EWMH_FULLSCREEN;
+	ignore_ewmh_struts = IGNORE_EWMH_STRUTS;
 
 	center_pseudo_tiled = CENTER_PSEUDO_TILED;
 	honor_size_hints = HONOR_SIZE_HINTS;

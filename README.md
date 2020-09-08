@@ -19,6 +19,8 @@ sxhkd  -------->  bspc  <------>  bspwm
 
 The default configuration file is `$XDG_CONFIG_HOME/bspwm/bspwmrc`: this is simply a shell script that calls *bspc*.
 
+An argument is passed to that script to indicate whether is was executed after a restart (`$1 -gt 0`) or not (`$1 -eq 0`).
+
 Keyboard and pointer bindings are defined with [sxhkd](https://github.com/baskerville/sxhkd).
 
 Example configuration files can be found in the [examples](examples) directory.
@@ -100,7 +102,7 @@ The *automatic* mode, as opposed to the *manual* mode, doesn't require any user 
 
 #### Longest side scheme
 
-When the value of the automatic scheme is `longest_side`, the window will be attached as if the insertion point was in manual mode and the split direction was choosen based on the dimensions of the tiling rectangle and the initial polarity.
+When the value of the automatic scheme is `longest_side`, the window will be attached as if the insertion point was in manual mode and the split direction was chosen based on the dimensions of the tiling rectangle and the initial polarity.
 
 Let's consider the following scenario, where the initial polarity is set to `second_child`:
 
@@ -130,6 +132,10 @@ In state *X*, a new window is added.
 Since *1* is wide, it gets split vertically and *2* is added as *a*'s second child given the initial polarity.
 
 This leads to *Y* where we insert window *3*. *2* is tall and is therefore split horizontally. *3* is once again added as *b*'s second child.
+
+#### Alternate scheme
+
+When the value of the automatic scheme is `alternate`, the window will be attached as if the insertion point was in manual mode and the split direction was chosen based on the split type of the insertion point's parent and the initial polarity. If the parent is split horizontally, the insertion point will be split vertically and vice versa.
 
 #### Spiral scheme
 
@@ -178,3 +184,10 @@ The *spiral* automatic scheme generates window spirals that rotate clockwise (re
 
 - The RandR and Xinerama protocols.
 - A subset of the EWMH and ICCCM standards.
+
+## Community
+
+Want to get in touch with other *bspwm* users or you need help? Join us on our:
+
+- Subreddit at [r/bspwm](https://www.reddit.com/r/bspwm/).
+- IRC channel at `#bspwm` on `chat.freenode.net` (maintained by [@dannycolin](https://github.com/dannycolin) / sdk on IRC).

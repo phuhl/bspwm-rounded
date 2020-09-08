@@ -39,7 +39,7 @@
 rule_t *make_rule(void)
 {
 	rule_t *r = calloc(1, sizeof(rule_t));
-	r->class_name[0] = r->instance_name[0] = r->effect[0] = '\0';
+	r->class_name[0] = r->instance_name[0] = r->name[0] = r->effect[0] = '\0';
 	r->next = r->prev = NULL;
 	r->one_shot = false;
 	return r;
@@ -83,10 +83,12 @@ void remove_rule_by_cause(char *cause)
 	rule_t *r = rule_head;
 	char *class_name = strtok(cause, COL_TOK);
 	char *instance_name = strtok(NULL, COL_TOK);
+	char *name = strtok(NULL, COL_TOK);
 	while (r != NULL) {
 		rule_t *next = r->next;
-		if ((streq(class_name, MATCH_ANY) || streq(r->class_name, class_name)) &&
-		    (instance_name == NULL || streq(instance_name, MATCH_ANY) || streq(r->instance_name, instance_name))) {
+		if ((class_name != NULL && (streq(class_name, MATCH_ANY) || streq(r->class_name, class_name))) &&
+		    (instance_name == NULL || streq(instance_name, MATCH_ANY) || streq(r->instance_name, instance_name)) &&
+		    (name == NULL || streq(name, MATCH_ANY) || streq(r->name, name))) {
 			remove_rule(r);
 		}
 		r = next;
@@ -104,7 +106,7 @@ bool remove_rule_by_index(int idx)
 	return false;
 }
 
-rule_consequence_t *make_rule_conquence(void)
+rule_consequence_t *make_rule_consequence(void)
 {
 	rule_consequence_t *rc = calloc(1, sizeof(rule_consequence_t));
 	rc->manage = rc->focus = rc->border = true;
@@ -189,6 +191,14 @@ event_queue_t *make_event_queue(xcb_generic_event_t *evt)
 	return eq;
 }
 
+
+#define SET_CSQ_SPLIT_DIR(val) \
+	do { \
+		if (csq->split_dir == NULL) { \
+			csq->split_dir = calloc(1, sizeof(direction_t)); \
+		} \
+		*(csq->split_dir) = (val); \
+	} while (0)
 
 #define SET_CSQ_STATE(val) \
 	do { \
@@ -281,6 +291,15 @@ void _apply_class(xcb_window_t win, rule_consequence_t *csq)
 	}
 }
 
+void _apply_name(xcb_window_t win, rule_consequence_t *csq)
+{
+	xcb_icccm_get_text_property_reply_t reply;
+	if (xcb_icccm_get_wm_name_reply(dpy, xcb_icccm_get_wm_name(dpy, win), &reply, NULL) == 1) {
+		snprintf(csq->name, sizeof(csq->name), "%s", reply.name);
+		xcb_icccm_get_text_property_reply_wipe(&reply);
+	}
+}
+
 void parse_keys_values(char *buf, rule_consequence_t *csq)
 {
 	char *key = strtok(buf, CSQ_BLK);
@@ -299,12 +318,14 @@ void apply_rules(xcb_window_t win, rule_consequence_t *csq)
 	_apply_transient(win, csq);
 	_apply_hints(win, csq);
 	_apply_class(win, csq);
+	_apply_name(win, csq);
 
 	rule_t *rule = rule_head;
 	while (rule != NULL) {
 		rule_t *next = rule->next;
 		if ((streq(rule->class_name, MATCH_ANY) || streq(rule->class_name, csq->class_name)) &&
-		    (streq(rule->instance_name, MATCH_ANY) || streq(rule->instance_name, csq->instance_name))) {
+		    (streq(rule->instance_name, MATCH_ANY) || streq(rule->instance_name, csq->instance_name)) &&
+		    (streq(rule->name, MATCH_ANY) || streq(rule->name, csq->name))) {
 			char effect[MAXLEN];
 			snprintf(effect, sizeof(effect), "%s", rule->effect);
 			parse_keys_values(effect, csq);
@@ -322,6 +343,7 @@ bool schedule_rules(xcb_window_t win, rule_consequence_t *csq)
 	if (external_rules_command[0] == '\0') {
 		return false;
 	}
+	resolve_rule_consequence(csq);
 	int fds[2];
 	if (pipe(fds) == -1) {
 		return false;
@@ -373,7 +395,10 @@ void parse_key_value(char *key, char *value, rule_consequence_t *csq)
 	} else if (streq("node", key)) {
 		snprintf(csq->node_desc, sizeof(csq->node_desc), "%s", value);
 	} else if (streq("split_dir", key)) {
-		snprintf(csq->split_dir, sizeof(csq->split_dir), "%s", value);
+		direction_t dir;
+		if (parse_direction(value, &dir)) {
+			SET_CSQ_SPLIT_DIR(dir);
+		}
 	} else if (streq("state", key)) {
 		client_state_t cst;
 		if (parse_client_state(value, &cst)) {
@@ -399,7 +424,7 @@ void parse_key_value(char *key, char *value, rule_consequence_t *csq)
 		}
 	} else if (parse_bool(value, &v)) {
 		if (streq("hidden", key)) {
-			csq->hidden = true;
+			csq->hidden = v;
 		}
 #define SETCSQ(name) \
 		else if (streq(#name, key)) { \
@@ -424,6 +449,6 @@ void parse_key_value(char *key, char *value, rule_consequence_t *csq)
 void list_rules(FILE *rsp)
 {
 	for (rule_t *r = rule_head; r != NULL; r = r->next) {
-		fprintf(rsp, "%s:%s %c> %s\n", r->class_name, r->instance_name, r->one_shot?'-':'=', r->effect);
+		fprintf(rsp, "%s:%s:%s %c> %s\n", r->class_name, r->instance_name, r->name, r->one_shot?'-':'=', r->effect);
 	}
 }

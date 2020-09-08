@@ -46,6 +46,7 @@ typedef enum {
 
 typedef enum {
 	SCHEME_LONGEST_SIDE,
+	SCHEME_ALTERNATE,
 	SCHEME_SPIRAL
 } automatic_scheme_t;
 
@@ -162,8 +163,8 @@ typedef enum {
 typedef struct {
 	option_bool_t automatic;
 	option_bool_t focused;
-	option_bool_t local;
 	option_bool_t active;
+	option_bool_t local;
 	option_bool_t leaf;
 	option_bool_t window;
 	option_bool_t tiled;
@@ -182,13 +183,20 @@ typedef struct {
 	option_bool_t below;
 	option_bool_t normal;
 	option_bool_t above;
+	option_bool_t horizontal;
+	option_bool_t vertical;
 } node_select_t;
 
 typedef struct {
 	option_bool_t occupied;
 	option_bool_t focused;
+	option_bool_t active;
 	option_bool_t urgent;
 	option_bool_t local;
+	option_bool_t tiled;
+	option_bool_t monocle;
+	option_bool_t user_tiled;
+	option_bool_t user_monocle;
 } desktop_select_t;
 
 typedef struct {
@@ -204,8 +212,9 @@ struct icccm_props_t {
 };
 
 typedef struct {
-	char class_name[3 * SMALEN / 2];
-	char instance_name[3 * SMALEN / 2];
+	char class_name[MAXLEN];
+	char instance_name[MAXLEN];
+	char name[MAXLEN];
 	unsigned int border_width;
 	unsigned int border_radius;
 	unsigned int drawn_border_radius;
@@ -269,6 +278,7 @@ struct desktop_t {
 	char name[SMALEN];
 	uint32_t id;
 	layout_t layout;
+	layout_t user_layout;
 	node_t *root;
 	node_t *focus;
 	desktop_t *prev;
@@ -329,7 +339,6 @@ struct event_queue_t {
 
 typedef struct subscriber_list_t subscriber_list_t;
 struct subscriber_list_t {
-	int fd;
 	FILE *stream;
 	char* fifo_path;
 	int field;
@@ -342,6 +351,7 @@ typedef struct rule_t rule_t;
 struct rule_t {
 	char class_name[MAXLEN];
 	char instance_name[MAXLEN];
+	char name[MAXLEN];
 	char effect[MAXLEN];
 	bool one_shot;
 	rule_t *prev;
@@ -349,12 +359,13 @@ struct rule_t {
 };
 
 typedef struct {
-	char class_name[3 * SMALEN / 2];
-	char instance_name[3 * SMALEN / 2];
+	char class_name[MAXLEN];
+	char instance_name[MAXLEN];
+	char name[MAXLEN];
 	char monitor_desc[MAXLEN];
 	char desktop_desc[MAXLEN];
 	char node_desc[MAXLEN];
-	char split_dir[SMALEN];
+	direction_t *split_dir;
 	double split_ratio;
 	stack_layer_t *layer;
 	client_state_t *state;

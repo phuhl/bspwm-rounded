@@ -33,6 +33,7 @@
 #include <signal.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include <string.h>
 #include <xcb/xinerama.h>
 #include "types.h"
 #include "desktop.h"
@@ -46,20 +47,63 @@
 #include "history.h"
 #include "ewmh.h"
 #include "rule.h"
+#include "restore.h"
+#include "query.h"
 #include "bspwm.h"
+
+xcb_connection_t *dpy;
+int default_screen, screen_width, screen_height;
+uint32_t clients_count;
+xcb_screen_t *screen;
+xcb_window_t root;
+char config_path[MAXLEN];
+
+monitor_t *mon;
+monitor_t *mon_head;
+monitor_t *mon_tail;
+monitor_t *pri_mon;
+history_t *history_head;
+history_t *history_tail;
+history_t *history_needle;
+rule_t *rule_head;
+rule_t *rule_tail;
+stacking_list_t *stack_head;
+stacking_list_t *stack_tail;
+subscriber_list_t *subscribe_head;
+subscriber_list_t *subscribe_tail;
+pending_rule_t *pending_rule_head;
+pending_rule_t *pending_rule_tail;
+
+xcb_window_t meta_window;
+motion_recorder_t motion_recorder;
+xcb_atom_t WM_STATE;
+xcb_atom_t WM_TAKE_FOCUS;
+xcb_atom_t WM_DELETE_WINDOW;
+int exit_status;
+
+bool auto_raise;
+bool sticky_still;
+bool hide_sticky;
+bool record_history;
+bool running;
+bool restart;
+bool randr;
 
 int main(int argc, char *argv[])
 {
 	fd_set descriptors;
 	char socket_path[MAXLEN];
+	char state_path[MAXLEN] = {0};
+	int run_level = 0;
 	config_path[0] = '\0';
-	int sock_fd, cli_fd, dpy_fd, max_fd, n;
+	int sock_fd = -1, cli_fd, dpy_fd, max_fd, n;
 	struct sockaddr_un sock_address;
 	char msg[BUFSIZ] = {0};
 	xcb_generic_event_t *event;
+	char *end;
 	int opt;
 
-	while ((opt = getopt(argc, argv, "hvc:")) != -1) {
+	while ((opt = getopt(argc, argv, "hvc:s:o:")) != -1) {
 		switch (opt) {
 			case 'h':
 				printf(WM_NAME " [-h|-v|-c CONFIG_PATH]\n");
@@ -71,6 +115,17 @@ int main(int argc, char *argv[])
 				break;
 			case 'c':
 				snprintf(config_path, sizeof(config_path), "%s", optarg);
+				break;
+			case 's':
+				run_level |= 1;
+				snprintf(state_path, sizeof(state_path), "%s", optarg);
+				break;
+			case 'o':
+				run_level |= 2;
+				sock_fd = strtol(optarg, &end, 0);
+				if (*end != '\0') {
+					sock_fd = -1;
+				}
 				break;
 		}
 	}
@@ -93,36 +148,46 @@ int main(int argc, char *argv[])
 	load_settings();
 	setup();
 
+	if (state_path[0] != '\0') {
+		restore_state(state_path);
+		unlink(state_path);
+	}
+
 	dpy_fd = xcb_get_file_descriptor(dpy);
 
-	char *sp = getenv(SOCKET_ENV_VAR);
-	if (sp != NULL) {
-		snprintf(socket_path, sizeof(socket_path), "%s", sp);
-	} else {
-		char *host = NULL;
-		int dn = 0, sn = 0;
-		if (xcb_parse_display(NULL, &host, &dn, &sn) != 0) {
-			snprintf(socket_path, sizeof(socket_path), SOCKET_PATH_TPL, host, dn, sn);
-		}
-		free(host);
-	}
-
-	sock_address.sun_family = AF_UNIX;
-	snprintf(sock_address.sun_path, sizeof(sock_address.sun_path), "%s", socket_path);
-
-	sock_fd = socket(AF_UNIX, SOCK_STREAM, 0);
-
 	if (sock_fd == -1) {
-		err("Couldn't create the socket.\n");
-	}
+		char *sp = getenv(SOCKET_ENV_VAR);
+		if (sp != NULL) {
+			snprintf(socket_path, sizeof(socket_path), "%s", sp);
+		} else {
+			char *host = NULL;
+			int dn = 0, sn = 0;
+			if (xcb_parse_display(NULL, &host, &dn, &sn) != 0) {
+				snprintf(socket_path, sizeof(socket_path), SOCKET_PATH_TPL, host, dn, sn);
+			}
+			free(host);
+		}
 
-	unlink(socket_path);
-	if (bind(sock_fd, (struct sockaddr *) &sock_address, sizeof(sock_address)) == -1) {
-		err("Couldn't bind a name to the socket.\n");
-	}
+		sock_address.sun_family = AF_UNIX;
+		if (snprintf(sock_address.sun_path, sizeof(sock_address.sun_path), "%s", socket_path) < 0) {
+			err("Couldn't write the socket path.\n");
+		}
 
-	if (listen(sock_fd, SOMAXCONN) == -1) {
-		err("Couldn't listen to the socket.\n");
+		sock_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+
+		if (sock_fd == -1) {
+			err("Couldn't create the socket.\n");
+		}
+
+		unlink(socket_path);
+
+		if (bind(sock_fd, (struct sockaddr *) &sock_address, sizeof(sock_address)) == -1) {
+			err("Couldn't bind a name to the socket.\n");
+		}
+
+		if (listen(sock_fd, SOMAXCONN) == -1) {
+			err("Couldn't listen to the socket.\n");
+		}
 	}
 
 	signal(SIGINT, sig_handler);
@@ -130,7 +195,7 @@ int main(int argc, char *argv[])
 	signal(SIGTERM, sig_handler);
 	signal(SIGCHLD, sig_handler);
 	signal(SIGPIPE, SIG_IGN);
-	run_config();
+	run_config(run_level);
 	running = true;
 
 	while (running) {
@@ -167,7 +232,7 @@ int main(int argc, char *argv[])
 
 			if (FD_ISSET(sock_fd, &descriptors)) {
 				cli_fd = accept(sock_fd, NULL, 0);
-				if (cli_fd > 0 && (n = recv(cli_fd, msg, sizeof(msg), 0)) > 0) {
+				if (cli_fd > 0 && (n = recv(cli_fd, msg, sizeof(msg)-1, 0)) > 0) {
 					msg[n] = '\0';
 					FILE *rsp = fdopen(cli_fd, "w");
 					if (rsp != NULL) {
@@ -191,11 +256,23 @@ int main(int argc, char *argv[])
 		if (!check_connection(dpy)) {
 			running = false;
 		}
+
+		prune_dead_subscribers();
+	}
+
+	if (restart) {
+		char *host = NULL;
+		int dn = 0, sn = 0;
+		if (xcb_parse_display(NULL, &host, &dn, &sn) != 0) {
+			snprintf(state_path, sizeof(state_path), STATE_PATH_TPL, host, dn, sn);
+		}
+		free(host);
+		FILE *f = fopen(state_path, "w");
+		query_state(f);
+		fclose(f);
 	}
 
 	cleanup();
-	close(sock_fd);
-	unlink(socket_path);
 	ungrab_buttons();
 	xcb_ewmh_connection_wipe(ewmh);
 	xcb_destroy_window(dpy, meta_window);
@@ -203,6 +280,38 @@ int main(int argc, char *argv[])
 	free(ewmh);
 	xcb_flush(dpy);
 	xcb_disconnect(dpy);
+
+	if (restart) {
+		int rargc;
+		for (rargc = 0; rargc < argc; rargc++) {
+			if (streq("-s", argv[rargc])) {
+				break;
+			}
+		}
+
+		int len = rargc + 5;
+		char **rargv = malloc(len * sizeof(char *));
+
+		for (int i = 0; i < rargc; i++) {
+			rargv[i] = argv[i];
+		}
+
+		char sock_fd_arg[SMALEN];
+		snprintf(sock_fd_arg, sizeof(sock_fd_arg), "%i", sock_fd);
+
+		rargv[rargc] = "-s";
+		rargv[rargc + 1] = state_path;
+		rargv[rargc + 2] = "-o";
+		rargv[rargc + 3] = sock_fd_arg;
+		rargv[rargc + 4] = 0;
+
+		exit_status = execvp(*rargv, rargv);
+		free(rargv);
+	}
+
+	close(sock_fd);
+	unlink(socket_path);
+
 	return exit_status;
 }
 
@@ -215,9 +324,10 @@ void init(void)
 	stack_head = stack_tail = NULL;
 	subscribe_head = subscribe_tail = NULL;
 	pending_rule_head = pending_rule_tail = NULL;
-	auto_raise = sticky_still = record_history = true;
+	auto_raise = sticky_still = hide_sticky = record_history = true;
 	randr_base = 0;
 	exit_status = 0;
+	restart = false;
 }
 
 void setup(void)
@@ -414,5 +524,18 @@ void sig_handler(int sig)
 			;
 	} else if (sig == SIGINT || sig == SIGHUP || sig == SIGTERM) {
 		running = false;
+	}
+}
+
+/* Adapted from i3wm */
+uint32_t get_color_pixel(const char *color)
+{
+	unsigned int red, green, blue;
+	if (sscanf(color + 1, "%02x%02x%02x", &red, &green, &blue) == 3) {
+		/* We set the first 8 bits high to have 100% opacity in case of a 32 bit
+		 * color depth visual. */
+		return (0xFF << 24) | (red << 16 | green << 8 | blue);
+	} else {
+		return screen->black_pixel;
 	}
 }

@@ -272,6 +272,9 @@ bool parse_automatic_scheme(char *s, automatic_scheme_t *a)
 	if (streq("longest_side", s)) {
 		*a = SCHEME_LONGEST_SIDE;
 		return true;
+	} else if (streq("alternate", s)) {
+		*a = SCHEME_ALTERNATE;
+		return true;
 	} else if (streq("spiral", s)) {
 		*a = SCHEME_SPIRAL;
 		return true;
@@ -497,8 +500,13 @@ bool parse_desktop_modifiers(char *desc, desktop_select_t *sel)
 		} else if (streq("!occupied", tok)) {
 			sel->occupied = OPTION_FALSE;
 		GET_MOD(focused)
+		GET_MOD(active)
 		GET_MOD(urgent)
 		GET_MOD(local)
+		GET_MOD(tiled)
+		GET_MOD(monocle)
+		GET_MOD(user_tiled)
+		GET_MOD(user_monocle)
 		} else {
 			return false;
 		}
@@ -519,8 +527,8 @@ bool parse_node_modifiers(char *desc, node_select_t *sel)
 			sel->tiled = OPTION_FALSE;
 		GET_MOD(automatic)
 		GET_MOD(focused)
-		GET_MOD(local)
 		GET_MOD(active)
+		GET_MOD(local)
 		GET_MOD(leaf)
 		GET_MOD(window)
 		GET_MOD(pseudo_tiled)
@@ -538,6 +546,8 @@ bool parse_node_modifiers(char *desc, node_select_t *sel)
 		GET_MOD(below)
 		GET_MOD(normal)
 		GET_MOD(above)
+		GET_MOD(horizontal)
+		GET_MOD(vertical)
 		} else {
 			return false;
 		}
