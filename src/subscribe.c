@@ -27,6 +27,7 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <stdarg.h>
+#include <fcntl.h>
 #include "bspwm.h"
 #include "desktop.h"
 #include "settings.h"
@@ -63,7 +64,10 @@ void remove_subscriber(subscriber_list_t *sb)
 	if (sb == subscribe_tail) {
 		subscribe_tail = a;
 	}
-	if (!restart) {
+	if (restart) {
+		int cli_fd = fileno(sb->stream);
+		fcntl(cli_fd, F_SETFD, ~FD_CLOEXEC & fcntl(cli_fd, F_GETFD));
+	} else {
 		fclose(sb->stream);
 		unlink(sb->fifo_path);
 	}
@@ -80,6 +84,8 @@ void add_subscriber(subscriber_list_t *sb)
 		sb->prev = subscribe_tail;
 		subscribe_tail = sb;
 	}
+	int cli_fd = fileno(sb->stream);
+	fcntl(cli_fd, F_SETFD, FD_CLOEXEC | fcntl(cli_fd, F_GETFD));
 	if (sb->field & SBSC_MASK_REPORT) {
 		print_report(sb->stream);
 		if (sb->count-- == 1) {
@@ -169,12 +175,8 @@ void prune_dead_subscribers(void)
 	subscriber_list_t *sb = subscribe_head;
 	while (sb != NULL) {
 		subscriber_list_t *next = sb->next;
-		// To check if a subscriber's stream is still open and writable call
-		// write with an empty buffer and check the returned value. If the
-		// stream is not writable anymore (i.e. it has been closed because the
-		// process associated to this subscriber no longer exists) then write()
-		// will return -1.
-		if (write(fileno(sb->stream), 0, 0) == -1) {
+		// Is the subscriber's stream closed?
+		if (write(fileno(sb->stream), NULL, 0) == -1) {
 			remove_subscriber(sb);
 		}
 		sb = next;

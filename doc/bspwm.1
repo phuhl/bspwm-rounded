@@ -2,12 +2,12 @@
 .\"     Title: bspwm
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
-.\"      Date: 09/08/2020
+.\"      Date: 06/01/2021
 .\"    Manual: Bspwm Manual
-.\"    Source: Bspwm 0.9.10-9-gab72002
+.\"    Source: Bspwm 0.9.10-31-ge21ab5b
 .\"  Language: English
 .\"
-.TH "BSPWM" "1" "09/08/2020" "Bspwm 0\&.9\&.10\-9\-gab72002" "Bspwm Manual"
+.TH "BSPWM" "1" "06/01/2021" "Bspwm 0\&.9\&.10\-31\-ge21ab5b" "Bspwm Manual"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -706,6 +706,11 @@ pixels horizontally and
 pixels vertically\&.
 .RE
 .PP
+\fB\-y\fR, \fB\-\-type\fR \fIhorizontal|vertical\fR
+.RS 4
+Set the splitting type of the selected node\&.
+.RE
+.PP
 \fB\-r\fR, \fB\-\-ratio\fR \fIRATIO\fR|(+|\-)(\fIPIXELS\fR|\fIFRACTION\fR)
 .RS 4
 Set the splitting ratio of the selected node (0 <
@@ -720,7 +725,7 @@ Rotate the tree rooted at the selected node\&.
 .PP
 \fB\-F\fR, \fB\-\-flip\fR \fIhorizontal|vertical\fR
 .RS 4
-Flip the the tree rooted at selected node\&.
+Flip the tree rooted at selected node\&.
 .RE
 .PP
 \fB\-E\fR, \fB\-\-equalize\fR
@@ -738,11 +743,16 @@ Adjust the split ratios of the tree rooted at the selected node so that all wind
 Circulate the windows of the tree rooted at the selected node\&.
 .RE
 .PP
-\fB\-t\fR, \fB\-\-state\fR [~](tiled|pseudo_tiled|floating|fullscreen)
+\fB\-t\fR, \fB\-\-state\fR ~|[~]\fISTATE\fR
 .RS 4
 Set the state of the selected window\&. If
 \fB~\fR
-is present and the current state matches the given state, then the argument is interpreted as the last state\&.
+is present and the current state matches
+\fISTATE\fR, then the argument is interpreted as its last state\&. If the argument is just
+\fB~\fR
+with
+\fISTATE\fR
+omitted, then the state of the selected window is set to its last state\&.
 .RE
 .PP
 \fB\-g\fR, \fB\-\-flag\fR hidden|sticky|private|locked|marked[=on|off]
@@ -952,13 +962,9 @@ Print a JSON representation of the matching item\&.
 \fBOptions\fR
 .RS 4
 .PP
-\fB\-m\fR,\fB\-\-monitor\fR [\fIMONITOR_SEL\fR], \fB\-d\fR,\fB\-\-desktop\fR [\fIDESKTOP_SEL\fR], \fB\-n\fR, \fB\-\-node\fR [\fINODE_SEL\fR]
+\fB\-m\fR,\fB\-\-monitor\fR [\fIMONITOR_SEL\fR|\fIMONITOR_MODIFIERS\fR], \fB\-d\fR,\fB\-\-desktop\fR [\fIDESKTOP_SEL\fR|\fIDESKTOP_MODIFIERS\fR], \fB\-n\fR, \fB\-\-node\fR [\fINODE_SEL\fR|\fINODE_MODIFIERS\fR]
 .RS 4
-Constrain matches to the selected monitor, desktop or node\&. The descriptor can be omitted for
-\fI\-M\fR,
-\fI\-D\fR
-and
-\fI\-N\fR\&.
+Constrain matches to the selected monitors, desktops or nodes\&.
 .RE
 .PP
 \fB\-\-names\fR
@@ -1248,6 +1254,11 @@ desktop layout\&.
 Set the desktop layout to
 \fBmonocle\fR
 if there\(cqs only one tiled window in the tree\&.
+.RE
+.PP
+\fIborderless_singleton\fR
+.RS 4
+Remove borders of the only window on the only monitor regardless its layout\&.
 .RE
 .PP
 \fIpointer_motion_interval\fR

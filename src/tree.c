@@ -90,7 +90,9 @@ void apply_layout(monitor_t *m, desktop_t *d, node_t *n, xcb_rectangle_t rect, x
 		}
 
 		unsigned int bw;
+		bool the_only_window = !m->prev && !m->next && d->root->client;
 		if ((borderless_monocle && d->layout == LAYOUT_MONOCLE && IS_TILED(n->client))
+		    || (borderless_singleton && the_only_window)
 		    || n->client->state == STATE_FULLSCREEN) {
 			bw = 0;
 		} else {
@@ -194,6 +196,17 @@ presel_t *make_presel(void)
 	p->split_ratio = split_ratio;
 	p->feedback = XCB_NONE;
 	return p;
+}
+
+void set_type(node_t *n, split_type_t typ)
+{
+	if (n == NULL) {
+		return;
+	}
+
+	n->split_type = typ;
+	update_constraints(n);
+	rebuild_constraints_towards_root(n);
 }
 
 void set_ratio(node_t *n, double rat)
@@ -439,8 +452,6 @@ node_t *insert_node(monitor_t *m, desktop_t *d, node_t *n, node_t *f)
 		}
 	}
 
-	m->sticky_count += sticky_count(n);
-
 	propagate_flags_upward(m, d, n);
 
 	if (d->focus == NULL && is_focusable(n)) {
@@ -454,6 +465,7 @@ void insert_receptacle(monitor_t *m, desktop_t *d, node_t *n)
 {
 	node_t *r = make_node(XCB_NONE);
 	insert_node(m, d, r, n);
+	put_status(SBSC_MASK_NODE_ADD, "node_add 0x%08X 0x%08X 0x%08X 0x%08X\n", m->id, d->id, n != NULL ? n->id : 0, r->id);
 
 	if (single_monocle && d->layout == LAYOUT_MONOCLE && tiled_count(d->root, true) > 1) {
 		set_layout(m, d, d->user_layout, false);
@@ -1191,7 +1203,8 @@ void find_by_area(area_peak_t ap, coordinates_t *ref, coordinates_t *dst, node_s
 void rotate_tree(node_t *n, int deg)
 {
 	rotate_tree_rec(n, deg);
-	rebuild_constraints(n);
+	rebuild_constraints_from_leaves(n);
+	rebuild_constraints_towards_root(n);
 }
 
 void rotate_tree_rec(node_t *n, int deg)
@@ -1319,10 +1332,6 @@ void unlink_node(monitor_t *m, desktop_t *d, node_t *n)
 
 	node_t *p = n->parent;
 
-	if (m->sticky_count > 0) {
-		m->sticky_count -= sticky_count(n);
-	}
-
 	if (p == NULL) {
 		d->root = NULL;
 		d->focus = NULL;
@@ -1406,13 +1415,16 @@ void kill_node(monitor_t *m, desktop_t *d, node_t *n)
 		return;
 	}
 
-	for (node_t *f = first_extrema(n); f != NULL; f = next_leaf(f, n)) {
-		if (f->client != NULL) {
-			xcb_kill_client(dpy, f->id);
+	if (IS_RECEPTACLE(n)) {
+		put_status(SBSC_MASK_NODE_REMOVE, "node_remove 0x%08X 0x%08X 0x%08X\n", m->id, d->id, n->id);
+		remove_node(m, d, n);
+	} else {
+		for (node_t *f = first_extrema(n); f != NULL; f = next_leaf(f, n)) {
+			if (f->client != NULL) {
+				xcb_kill_client(dpy, f->id);
+			}
 		}
 	}
-
-	remove_node(m, d, n);
 }
 
 void remove_node(monitor_t *m, desktop_t *d, node_t *n)
@@ -1425,6 +1437,9 @@ void remove_node(monitor_t *m, desktop_t *d, node_t *n)
 	history_remove(d, n, true);
 	remove_stack_node(n);
 	cancel_presel_in(m, d, n);
+	if (m->sticky_count > 0 && d == m->desk) {
+		m->sticky_count -= sticky_count(n);
+	}
 	clients_count -= clients_count_in(n);
 	if (is_descendant(grabbed_node, n)) {
 		grabbed_node = NULL;
@@ -1606,7 +1621,8 @@ bool transfer_node(monitor_t *ms, desktop_t *ds, node_t *ns, monitor_t *md, desk
 		return false;
 	}
 
-	if (sticky_still && ms->sticky_count > 0 && sticky_count(ns) > 0 && dd != md->desk) {
+	unsigned int sc = (ms->sticky_count > 0 && ds == ms->desk) ? sticky_count(ns) : 0;
+	if (sticky_still && sc > 0 && dd != md->desk) {
 		return false;
 	}
 
@@ -1628,6 +1644,8 @@ bool transfer_node(monitor_t *ms, desktop_t *ds, node_t *ns, monitor_t *md, desk
 		if (ns->client == NULL || monitor_from_client(ns->client) != md) {
 			adapt_geometry(&ms->rectangle, &md->rectangle, ns);
 		}
+		ms->sticky_count -= sc;
+		md->sticky_count += sc;
 	}
 
 	if (ds != dd) {
@@ -1974,15 +1992,30 @@ void neutralize_occluding_windows(monitor_t *m, desktop_t *d, node_t *n)
 	}
 }
 
-void rebuild_constraints(node_t *n)
+void rebuild_constraints_from_leaves(node_t *n)
 {
 	if (n == NULL || is_leaf(n)) {
 		return;
 	} else {
-		rebuild_constraints(n->first_child);
-		rebuild_constraints(n->second_child);
+		rebuild_constraints_from_leaves(n->first_child);
+		rebuild_constraints_from_leaves(n->second_child);
 		update_constraints(n);
 	}
+}
+
+void rebuild_constraints_towards_root(node_t *n)
+{
+	if (n == NULL) {
+		return;
+	}
+
+	node_t *p = n->parent;
+
+	if (p != NULL) {
+		update_constraints(p);
+	}
+
+	rebuild_constraints_towards_root(p);
 }
 
 void update_constraints(node_t *n)
