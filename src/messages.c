@@ -472,13 +472,13 @@ void cmd_node(char **args, int num, FILE *rsp)
 			split_type_t typ;
 			if (parse_cycle_direction(*args, &cyc)) {
 				set_type(trg.node, (trg.node->split_type + 1) % 2);
+				changed = true;
 			} else if (parse_split_type(*args, &typ)) {
-				set_type(trg.node, typ);
+				changed |= set_type(trg.node, typ);
 			} else {
 				fail(rsp, "");
 				break;
 			}
-			changed = true;
 		} else if (streq("-r", *args) || streq("--ratio", *args)) {
 			num--, args++;
 			if (num < 1) {
@@ -500,7 +500,7 @@ void cmd_node(char **args, int num, FILE *rsp)
 						rat = ((max * rat) + delta) / max;
 					}
 					if (rat > 0 && rat < 1) {
-						set_ratio(trg.node, rat);
+						changed |= set_ratio(trg.node, rat);
 					} else {
 						fail(rsp, "");
 						break;
@@ -512,13 +512,12 @@ void cmd_node(char **args, int num, FILE *rsp)
 			} else {
 				double rat;
 				if (sscanf(*args, "%lf", &rat) == 1 && rat > 0 && rat < 1) {
-					set_ratio(trg.node, rat);
+					changed |= set_ratio(trg.node, rat);
 				} else {
 					fail(rsp, "node %s: Invalid argument: '%s'.\n", *(args - 1), *args);
 					break;
 				}
 			}
-			changed = true;
 		} else if (streq("-F", *args) || streq("--flip", *args)) {
 			num--, args++;
 			if (num < 1) {
@@ -1174,12 +1173,27 @@ void cmd_rule(char **args, int num, FILE *rsp)
 				return;
 			}
 			rule_t *rule = make_rule();
-			char *class_name = strtok(*args, COL_TOK);
-			char *instance_name = strtok(NULL, COL_TOK);
-			char *name = strtok(NULL, COL_TOK);
+
+			struct tokenize_state state;
+			char *class_name = tokenize_with_escape(&state, args[0], COL_TOK[0]);
+			char *instance_name = tokenize_with_escape(&state, NULL, COL_TOK[0]);
+			char *name = tokenize_with_escape(&state, NULL, COL_TOK[0]);
+			if (!class_name || !instance_name || !name) {
+				free(class_name);
+				free(instance_name);
+				free(name);
+				return;
+			}
+
 			snprintf(rule->class_name, sizeof(rule->class_name), "%s", class_name);
-			snprintf(rule->instance_name, sizeof(rule->instance_name), "%s", instance_name==NULL?MATCH_ANY:instance_name);
-			snprintf(rule->name, sizeof(rule->name), "%s", name==NULL?MATCH_ANY:name);
+			snprintf(rule->instance_name, sizeof(rule->instance_name), "%s",
+					 instance_name[0] == '\0' ? MATCH_ANY : instance_name);
+			snprintf(rule->name, sizeof(rule->name), "%s",
+					 name[0] == '\0' ? MATCH_ANY : name);
+			free(class_name);
+			free(instance_name);
+			free(name);
+
 			num--, args++;
 			size_t i = 0;
 			while (num > 0) {
